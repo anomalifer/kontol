@@ -2,5 +2,12 @@
   "user": [
     ""
   ],
-  "users": {}
+  "users": {
+    "8358478736": {
+      "role": "reseller",
+      "username": "iqbalbriyanz",
+      "added_by": 6888530451,
+      "added_at": "2026-05-05T14:39:54.872Z"
+    }
+  }
 }
